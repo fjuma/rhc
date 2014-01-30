@@ -294,6 +294,40 @@ module RHC::Commands
       0
     end
 
+    summary "Upgrade an application based on a downloadable cartridge"
+    description <<-DESC
+      Saves the current state of your application, then deletes it and
+      creates a new application with the same name, and restores it
+      to the state in the saved snapshot. This allows you to use
+      an updated version of a downloadable cartridge without losing
+      your configuration.
+      DESC
+    syntax "<app> <cartridge> [... <cartridge>] [... VARIABLE=VALUE] [--namespace NAME]"
+    takes_application :argument => true
+    option ["-n", "--namespace NAME"], "Namespace for the application"
+    option ["-f", "--filepath FILE"], "Local path to save/restore tarball (default: ./$APPNAME.tar.gz)"
+    option ["--ssh PATH"], "Full path to your SSH executable with additional options"
+    option ["-g", "--gear-size SIZE"], "Gear size controls how much memory and CPU your cartridges can use."
+    option ["-s", "--scaling"], "Enable scaling for the web cartridge."
+    option ["-r", "--repo DIR"], "Path to the Git repository (defaults to ./$app_name)"
+    option ["-e", "--env VARIABLE=VALUE"], "Environment variable(s) to be set on this app, or path to a file containing environment variables", :type => :list
+    option ["--[no-]git"], "Skip creating the local Git repository."
+    option ['--no-keys'], "Skip checking SSH keys during app creation", :hide => true
+    option ["--enable-jenkins [NAME]"], "Enable Jenkins builds for this application (will create a Jenkins application if not already available). The default name will be 'jenkins' if not specified."
+    argument :cartridges, "The web framework this application should use", ["-t", "--type CARTRIDGE"], :optional => true, :type => :list
+    def upgrade(app, cartridges)
+      arg_envs, cartridges = cartridges.partition{|item| item.match(env_var_regex_pattern)}
+      cartridges = check_cartridges(cartridges, &require_one_web_cart)
+
+      snapshot = Snapshot.new(options, config)
+      snapshot.save(app)
+      delete(app)
+      create(app, cartridges)
+      snapshot.restore(app)
+      results { say "#{app} upgraded" }
+      0
+    end
+
     summary "Clean out the application's logs and tmp directories and tidy up the git repo on the server"
     syntax "<app> [--namespace NAME]"
     takes_application :argument => true
